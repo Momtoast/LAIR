@@ -1,0 +1,123 @@
+from adafruit_circuitplayground import cp
+import time
+import pulseio
+import digitalio
+import adafruit_irremote
+import board
+from adafruit_debouncer import Button
+from digitalio import DigitalInOut
+import neopixel_write
+
+button_svc = ButtonService()
+button_svc.set_pressed(cp.switch, cp.button_a, cp.button_b)
+
+pulsein = pulseio.PulseIn(board.A3, maxlen=200, idle_state=True)
+decoder = adafruit_irremote.GenericDecode()
+
+button = Button(lambda: cp.button_a)
+button2 = Button(lambda: cp.button_b)
+
+hits = 0
+three_hits = 0
+zombie = 0
+regen = 1
+heals = (255, 0, 93, 162) #255 for remoteS
+heals2 = (255, 0, 93, 81)
+bpress = 1
+
+RED = (255, 0, 0)
+YELLOW = (255, 150, 0)
+GREEN = (0, 255, 0)
+CYAN = (0, 255, 255)
+BLUE = (0, 0, 255)
+PURPLE = (180, 0, 255)
+WHITE = (255, 255, 255)
+OFF = (0, 0, 0)
+flashColor = RED
+
+cp.pixels.brightness = 0.05
+
+def color_chase(color, wait):
+    for i in range(10):
+        cp.pixels[i] = color
+        time.sleep(wait)
+    time.sleep(0.02)
+
+def flash_hit(color, flashColor):
+    color_chase(flashColor, .02)
+    color_chase(OFF, .02)
+    color_chase(color, .02)
+    cp.play_file("examples_dip.wav")
+
+def flash(color):
+    cp.pixels.fill(OFF)
+    time.sleep(.3)
+    cp.pixels.fill(color)
+    time.sleep(.3)
+    cp.pixels.fill(OFF)
+    time.sleep(.3)
+    cp.pixels.fill(color)
+    time.sleep(.3)
+    cp.play_file("examples_rise.wav")
+
+def timer(color):
+    cp.pixels.fill(WHITE)
+    for p in range(10):
+        time.sleep(1)
+        cp.pixels[p] = (0, 0, 0)
+    cp.pixels.fill(color)
+
+cp.pixels.fill(GREEN)
+
+while True:
+   ble.stop_advertising()
+
+   cp.pixels.fill(GREEN)
+
+   button.update()
+
+   pulses = decoder.read_pulses(pulsein, blocking=False)
+
+   if button.rose:
+       print("Button A pressed!")
+       if bpress < 3:
+           bpress = bpress +1
+       else:
+           bpress = 1
+   elif button.fell:
+       print("No More Button!")
+
+   try:
+       if pulses != None:
+           received_code = decoder.decode_bits(pulses)
+           print("NEC Infrared code received: ", received_code)
+           if received_code == heals or received_code == heals2:
+               flash(GREEN)
+               hits = 0
+           else:
+               if pulses and bpress ==1:
+                   if hits < 2 and received_code != (255, 0, 189, 33):
+                       flash_hit(GREEN, flashColor)
+                       hits = hits + 1
+                   elif received_code != (255, 0, 189, 33):
+                       flash_hit(RED, flashColor)
+
+               if pulses and bpress ==2:
+                   if hits < 0:
+                       flash_hit(PURPLE, flashColor)
+                       hits = hits + 1
+                   elif hits < 2:
+                       flash_hit(PURPLE, flashColor)
+                       hits = hits + 1
+                   else:
+                       flash_hit(RED, flashColor)
+
+               if pulses and bpress ==3:
+                   flash_hit(RED, flashColor)
+
+   except adafruit_irremote.IRNECRepeatException:
+       continue
+   except adafruit_irremote.IRDecodeException as e:
+       continue
+   except adafruit_irremote.FailedToDecode:
+       continue
